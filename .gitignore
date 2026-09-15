@@ -1,0 +1,19 @@
+# secrets & local config
+.env
+
+# runtime artifacts
+runs/
+eval/reports/
+
+# python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# local tool artifacts
+.mimosa/
+.video_agent/
+.DS_Store
