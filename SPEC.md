@@ -192,3 +192,4 @@ chatbi-agent/
 已收口：
 - PG 环境（2026-09-14）：本机 Homebrew PostgreSQL 17.11 已安装；服务启动、建库 `chatbi`、建账号 `chatbi_app`/`chatbi_ro` 归环境 ticket（T1）。
 - 智谱模型（2026-09-14）：`glm-5.3`，key 与端点复用 `mine/gewu/.env`（T1 建 `.env` 时拷贝，不入库）。
+- PG 部署形态（2026-09-15）：确认继续用 brew 单实例、**按库隔离**（每项目独立 database + 独立角色，不切 Docker——内网 DNS 封锁全部容器镜像源，离线导镜像维护成本高）；`brew pin postgresql@17` 锁版本防 brew 自动升级动数据目录。
