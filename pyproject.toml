@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1",
     "langgraph>=1.2.11",
+    "langgraph-checkpoint-sqlite>=3.0.0",
     "openai>=3.14.0",
     "psycopg[binary]>=3.3.5",
     "python-dotenv>=1.2.3",
@@ -31,6 +32,9 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "integration: 需要真实环境的用例（本机 PG mock 数据 / 智谱 API key，缺失自动 skip）",
+]
 
 [tool.ruff]
 line-length = 100
