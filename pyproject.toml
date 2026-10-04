@@ -13,6 +13,7 @@ dependencies = [
     "langgraph-checkpoint-sqlite>=3.0.0",
     "openai>=3.14.0",
     "psycopg[binary]>=3.3.5",
+    "rich>=15.0.0",
     "python-dotenv>=1.2.3",
     "pyyaml>=6.0.3",
     "sqlglot>=30.18.0",
@@ -26,7 +27,6 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
-    "rich>=15.0.0",
     "ruff>=0.16.7",
 ]
 

@@ -1,0 +1,17 @@
+.git
+.gitignore
+.idea
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+runs
+docs
+tests
+eval/reports
+.env
+.video_agent
+.mimosa
+Dockerfile
+.dockerignore

@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: 安装依赖
+        run: uv sync --frozen
+
+      - name: Lint（ruff）
+        run: uv run ruff check .
+
+      - name: 单元测试（无真实 LLM key / 无本机 PG）
+        # 163 条中 150 条纯单测（FakeLLM + 工具替身 + ASGI mock）；
+        # 13 条 integration 需要本机 brew PG 与智谱 key，缺失环境时自动跳过口径在 CI 整体排除。
+        run: uv run pytest -m "not integration" -q
