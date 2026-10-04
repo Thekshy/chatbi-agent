@@ -1,0 +1,1835 @@
+# ChatBI v1 离线评测集（SPEC §8.2 · T9）。期望值由 validate_dataset.py 连库实测写回，勿手改。
+# 分层：single_metric×15 / compare×10 / drilldown×12 / topn×8 / dirty×5，共 50 题。
+# 金额单位=元；比率=小数（如 0.0697 即 +6.97 个百分点）。口径一律 SPEC §5.2：
+# GMV/支付订单数/客单价取 status∈{paid,shipped,completed}，时间锚 paid_at，窗口 [起, 止)。
+# 相对时间（最近 N 天 / 上个月）以数据末日 2026-09-13 为「今天」；数据仅一年，
+# 同比（对上年同月）不可出题，compare 层由月环比 + 周对周（周一起始）构成。
+# standard_sql 结果形态：标量题=1 行（第 1 列为主数值）；drilldown=单行因子分解
+# 或多行 (dim,cur,prev,delta,share)；topn=多行 (dim,metric[,share])，顺序即名次。
+meta:
+  checked_at: '2026-09-16T09:48:04'
+  db_orders: 104209
+  db_paid_range:
+  - '2025-09-15'
+  - '2026-09-13'
+questions:
+- id: sm001
+  question: 上个月护肤品类的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'
+      AND p.category_l1 = '护肤'
+  expected:
+    value: 2548736.59
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 上个月（=2026-08）护肤品类 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 「上个月」以数据末日 2026-09-13 为「今天」，即 2026-08；窗口 [2026-08-01, 2026-09-01)。
+- id: sm002
+  question: 2026 年 5 月面部精华的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-06-01'
+      AND p.category_l1 = '护肤' AND p.category_l2 = '面部精华'
+  expected:
+    value: 1049581.05
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 2026-05 面部精华 GMV（元），故事 1 基准月
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 窗口 [2026-05-01, 2026-06-01)；l2=面部精华 属 l1=护肤。
+- id: sm003
+  question: 2026 年 6 月面部精华的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+      AND p.category_l1 = '护肤' AND p.category_l2 = '面部精华'
+  expected:
+    value: 782689.91
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 2026-06 面部精华 GMV（元），故事 1 下滑月
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 窗口 [2026-06-01, 2026-07-01)；l2=面部精华 属 l1=护肤。
+- id: sm004
+  question: 直播间渠道最近 30 天的支付订单数
+  type: single_metric
+  standard_sql: |
+    SELECT COUNT(*)::int AS paid_orders
+    FROM orders o
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.channel = 'live'
+      AND o.paid_at >= DATE '2026-08-15' AND o.paid_at < DATE '2026-09-14'
+  expected:
+    value: 2167
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 最近 30 天 live 渠道支付订单数（单）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 「最近 30 天」锚数据末日 2026-09-13，窗口 [2026-08-15, 2026-09-14)；渠道在 orders 上。
+- id: sm005
+  question: 618 大促期间全场的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-05-31' AND o.paid_at < DATE '2026-06-19'
+  expected:
+    value: 4269792.59
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 618 大促期间全场 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 活动窗口取 promotions 中「618大促」start~end 含端点，即 [2026-05-31, 2026-06-19)。
+- id: sm006
+  question: 2026 年 8 月香水品类的客单价是多少
+  type: single_metric
+  standard_sql: |
+    SELECT (COALESCE(SUM(oi.unit_price * oi.quantity), 0)
+            / NULLIF(COUNT(DISTINCT o.order_id), 0))::float AS aov,
+           COUNT(DISTINCT o.order_id)::int AS paid_orders
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'
+      AND p.category_l1 = '香水'
+  expected:
+    value: 1525.442611
+    direction: none
+    extras:
+      paid_orders: 540
+    tolerance: 0.02
+  value_desc: 2026-08 香水客单价（元/单）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 客单价 = GMV ÷ 支付订单数（去重 order_id）；窗口 [2026-08-01, 2026-09-01)。
+- id: sm007
+  question: 2026 年第二季度彩妆品类的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-04-01' AND o.paid_at < DATE '2026-07-01'
+      AND p.category_l1 = '彩妆'
+  expected:
+    value: 6238034.61
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 2026 Q2（4-6 月）彩妆 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: Q2 = [2026-04-01, 2026-07-01) 整三个月。
+- id: sm008
+  question: 品牌「雪滢」2026 年 6 月的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+      AND p.brand = '雪滢'
+  expected:
+    value: 751858.34
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 雪滢品牌 2026-06 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 品牌在 products 上；雪滢为护肤品牌（故事 3 的全场 Top1）。
+- id: sm009
+  question: 2026 年 7 月护肤品类的转化率是多少
+  type: single_metric
+  standard_sql: |
+    SELECT (COUNT(DISTINCT o.order_id)::float
+            / NULLIF((SELECT SUM(uv) FROM traffic_daily
+                      WHERE category_l1 = '护肤'
+                        AND "date" >= DATE '2026-07-01' AND "date" < DATE '2026-08-01'), 0))::float AS cvr,
+           COUNT(DISTINCT o.order_id)::int AS paid_orders
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'
+      AND p.category_l1 = '护肤'
+  expected:
+    value: 0.03628
+    direction: none
+    extras:
+      paid_orders: 2270
+    tolerance: 0.02
+  value_desc: 2026-07 护肤月度转化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 月度品类转化率 = Σ日支付订单数 ÷ Σ日 UV（§5.2）；UV 取 traffic_daily 同窗护肤 l1。
+- id: sm010
+  question: 2026 年 9 月 1 日到 13 日女装品类的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-09-01' AND o.paid_at < DATE '2026-09-14'
+      AND p.category_l1 = '女装'
+  expected:
+    value: 400907.2
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 2026-09-01~09-13（含两端）女装 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 两端均含全天，窗口 [2026-09-01, 2026-09-14)；09-13 为数据末日。
+- id: sm011
+  question: 2025 年双 11 大促期间全场的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2025-11-01' AND o.paid_at < DATE '2025-11-12'
+  expected:
+    value: 4423663.51
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 双 11（2025-11-01~11-11）全场 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 取 promotions「双11大促」区间含端点：[2025-11-01, 2025-11-12)。
+- id: sm012
+  question: 小程序渠道 2026 年 6 月的 GMV 是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.channel = 'mini'
+      AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+  expected:
+    value: 1616041.08
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: mini 渠道 2026-06 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 渠道在 orders 上，无需关联 products；窗口 [2026-06-01, 2026-07-01)。
+- id: sm013
+  question: 2026 年 6 月配饰品类的 UV 总量是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COALESCE(SUM(uv), 0)::int AS uv
+    FROM traffic_daily
+    WHERE category_l1 = '配饰'
+      AND "date" >= DATE '2026-06-01' AND "date" < DATE '2026-07-01'
+  expected:
+    value: 15771
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 2026-06 配饰 UV 总量（人次）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 流量指标走 traffic_daily，UV 为各日各渠道求和；窗口 [2026-06-01, 2026-07-01)。
+- id: sm014
+  question: 2026 年上半年男装品类的支付订单数是多少
+  type: single_metric
+  standard_sql: |
+    SELECT COUNT(DISTINCT o.order_id)::int AS paid_orders
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-01-01' AND o.paid_at < DATE '2026-07-01'
+      AND p.category_l1 = '男装'
+  expected:
+    value: 3816
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 2026 H1（1-6 月）男装支付订单数（单）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: H1 = [2026-01-01, 2026-07-01)；一单可含多明细，订单数须去重 order_id。
+- id: sm015
+  question: 2026 年 5 月新客的 30 日复购率是多少
+  type: single_metric
+  standard_sql: |
+    WITH paid AS (
+      SELECT user_id, paid_at FROM orders
+      WHERE status IN ('paid', 'shipped', 'completed')),
+    first_order AS (
+      SELECT user_id, MIN(paid_at) AS fp FROM paid GROUP BY user_id),
+    new_users AS (
+      SELECT user_id, fp FROM first_order
+      WHERE fp >= DATE '2026-05-01' AND fp < DATE '2026-06-01'),
+    repeaters AS (
+      SELECT DISTINCT n.user_id FROM new_users n
+      JOIN paid ON paid.user_id = n.user_id
+       AND paid.paid_at > n.fp AND paid.paid_at <= n.fp + interval '30 days')
+    SELECT ((SELECT count(*) FROM repeaters)::float
+            / NULLIF((SELECT count(*) FROM new_users), 0))::float AS repeat_rate,
+           (SELECT count(*) FROM new_users)::int AS new_users,
+           (SELECT count(*) FROM repeaters)::int AS repeaters
+  expected:
+    value: 0.113019
+    direction: none
+    extras:
+      new_users: 1398
+      repeaters: 158
+    tolerance: 0.02
+  value_desc: 2026-05 首单新客的 30 日复购率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: §5.2：首单（paid 口径、全时段取 MIN）落在 [2026-05-01, 2026-06-01) 的用户为新客； 30 日内（fp, fp+30d] 有第二单即复购；复购率 =
+    复购新客 ÷新客数。
+- id: cmp001
+  question: 2026 年 6 月全场 GMV 环比 5 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH m AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-06-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-07-01')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM m
+  expected:
+    value: -0.087125
+    direction: down
+    extras:
+      cur: 6650712.33
+      prev: 7285455.96
+    tolerance: 0.02
+  value_desc: 6 月全场 GMV 环比变化率（小数，负=下滑）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 环比 = (6月−5月)÷5月；两窗 [06-01,07-01) 与 [05-01,06-01)。
+- id: cmp002
+  question: 面部精华 6 月 GMV 环比 5 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH m AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-06-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-07-01'
+        AND p.category_l1 = '护肤' AND p.category_l2 = '面部精华')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM m
+  expected:
+    value: -0.254283
+    direction: down
+    extras:
+      cur: 782689.91
+      prev: 1049581.05
+    tolerance: 0.02
+  value_desc: 面部精华 6 月 GMV 环比变化率（小数，故事 1 主指标）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: SPEC §5.3 故事 1：预期约 -25.4%；窗口同 cmp001。
+- id: cmp003
+  question: 护肤品类 6 月的流量（UV）环比 5 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH u AS (
+      SELECT (SUM(uv) FILTER (WHERE "date" >= DATE '2026-06-01' AND "date" < DATE '2026-07-01'))::float AS cur,
+             (SUM(uv) FILTER (WHERE "date" >= DATE '2026-05-01' AND "date" < DATE '2026-06-01'))::float AS prev
+      FROM traffic_daily
+      WHERE category_l1 = '护肤'
+        AND "date" >= DATE '2026-05-01' AND "date" < DATE '2026-07-01')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM u
+  expected:
+    value: -0.155214
+    direction: down
+    extras:
+      cur: 55652
+      prev: 65877
+    tolerance: 0.02
+  value_desc: 护肤 l1 月度 UV 环比变化率（小数，故事 1 流量侧）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: traffic_daily 无 l2 粒度，流量侧取护肤 l1（§5.3 分解口径）；SPEC 预期约 -15.5%。
+- id: cmp004
+  question: 2026 年 7 月全场 GMV 环比 6 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH m AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-08-01')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM m
+  expected:
+    value: 0.103463
+    direction: up
+    extras:
+      cur: 7338818.16
+      prev: 6650712.33
+    tolerance: 0.02
+  value_desc: 7 月全场 GMV 环比变化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 故事 1 回升背景（7 月上旬回升）；两窗 [07-01,08-01) 与 [06-01,07-01)。
+- id: cmp005
+  question: 2026 年 8 月全场客单价环比 7 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH a AS (
+      SELECT ((SUM(oi.unit_price * oi.quantity)
+               FILTER (WHERE o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'))
+              / NULLIF(COUNT(DISTINCT o.order_id)
+                       FILTER (WHERE o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'), 0))::float AS cur,
+             ((SUM(oi.unit_price * oi.quantity)
+               FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'))
+              / NULLIF(COUNT(DISTINCT o.order_id)
+                       FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'), 0))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-09-01')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM a
+  expected:
+    value: 0.008926
+    direction: up
+    extras:
+      cur: 1012.626764
+      prev: 1003.667691
+    tolerance: 0.02
+  value_desc: 8 月全场客单价环比变化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 客单价 = GMV ÷ 支付订单数，先各月求值再作比；分母为去重 order_id。
+- id: cmp006
+  question: 2026 年 8 月香水品类 GMV 环比 7 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH m AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-09-01'
+        AND p.category_l1 = '香水')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM m
+  expected:
+    value: 0.188459
+    direction: up
+    extras:
+      cur: 823739.01
+      prev: 693115.34
+    tolerance: 0.02
+  value_desc: 香水 l1 8 月 GMV 环比变化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 8 月无香水活动、7 月有暑期狂欢（全场），看品类净趋势；两窗 [08-01,09-01) 与 [07-01,08-01)。
+- id: cmp007
+  question: 2026 年 6 月直播间渠道 GMV 环比 5 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH m AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-06-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.channel = 'live'
+        AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-07-01')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM m
+  expected:
+    value: -0.089421
+    direction: down
+    extras:
+      cur: 2032613.94
+      prev: 2232221.77
+    tolerance: 0.02
+  value_desc: live 渠道 6 月 GMV 环比变化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 渠道维度环比；6 月含 618（直播间受益），预期方向为正。
+- id: cmp008
+  question: 9 月第二周全场支付订单数环比前一周变化了多少
+  type: compare
+  standard_sql: |
+    WITH c AS (
+      SELECT (COUNT(*) FILTER (WHERE o.paid_at >= DATE '2026-09-07' AND o.paid_at < DATE '2026-09-14'))::float AS cur,
+             (COUNT(*) FILTER (WHERE o.paid_at >= DATE '2026-08-31' AND o.paid_at < DATE '2026-09-07'))::float AS prev
+      FROM orders o
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-08-31' AND o.paid_at < DATE '2026-09-14')
+    SELECT ((cur - prev) / prev)::float AS change_rate,
+           cur::int AS cur_orders, prev::int AS prev_orders
+    FROM c
+  expected:
+    value: -0.049354
+    direction: down
+    extras:
+      cur_orders: 1618
+      prev_orders: 1702
+    tolerance: 0.02
+  value_desc: 周对周支付订单数变化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 周一起始：本周 [2026-09-07, 2026-09-14)，上周 [2026-08-31, 2026-09-07)，各 7 天。
+- id: cmp009
+  question: 6 月第二周全场 GMV 环比第一周变化了多少
+  type: compare
+  standard_sql: |
+    WITH m AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-08' AND o.paid_at < DATE '2026-06-15'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-06-08'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-06-15')
+    SELECT ((cur - prev) / prev)::float AS change_rate, cur, prev FROM m
+  expected:
+    value: -0.010117
+    direction: down
+    extras:
+      cur: 1561654.35
+      prev: 1577614.45
+    tolerance: 0.02
+  value_desc: 周对周 GMV 变化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 周一起始：第二周 [2026-06-08, 2026-06-15)，第一周 [2026-06-01, 2026-06-08)。
+- id: cmp010
+  question: 2026 年 7 月护肤品类转化率环比 6 月变化了多少
+  type: compare
+  standard_sql: |
+    WITH t AS (
+      SELECT (COUNT(DISTINCT o.order_id)
+              FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'))::float AS o_cur,
+             (COUNT(DISTINCT o.order_id)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'))::float AS o_prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-08-01'
+        AND p.category_l1 = '护肤'),
+    u AS (
+      SELECT (SUM(uv) FILTER (WHERE "date" >= DATE '2026-07-01' AND "date" < DATE '2026-08-01'))::float AS u_cur,
+             (SUM(uv) FILTER (WHERE "date" >= DATE '2026-06-01' AND "date" < DATE '2026-07-01'))::float AS u_prev
+      FROM traffic_daily
+      WHERE category_l1 = '护肤'
+        AND "date" >= DATE '2026-06-01' AND "date" < DATE '2026-08-01')
+    SELECT (((t.o_cur / u.u_cur) - (t.o_prev / u.u_prev)) / NULLIF(t.o_prev / u.u_prev, 0))::float AS change_rate,
+           (t.o_cur / u.u_cur)::float AS cvr_cur,
+           (t.o_prev / u.u_prev)::float AS cvr_prev
+    FROM t, u
+  expected:
+    value: -0.005883
+    direction: down
+    extras:
+      cvr_cur: 0.03628
+      cvr_prev: 0.036495
+    tolerance: 0.02
+  value_desc: 护肤月度转化率环比变化率（小数）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 各月转化率 = Σ支付订单数 ÷ ΣUV，先求率再作比；故事 1 7 月回升段。
+- id: dr001
+  question: 面部精华 6 月 GMV 为何环比下滑，流量和转化各贡献多少
+  type: drilldown
+  standard_sql: |
+    WITH g AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-06-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-07-01'
+        AND p.category_l1 = '护肤' AND p.category_l2 = '面部精华'),
+    u AS (
+      SELECT (SUM(uv) FILTER (WHERE "date" >= DATE '2026-06-01' AND "date" < DATE '2026-07-01'))::float AS cur,
+             (SUM(uv) FILTER (WHERE "date" >= DATE '2026-05-01' AND "date" < DATE '2026-06-01'))::float AS prev
+      FROM traffic_daily
+      WHERE category_l1 = '护肤'
+        AND "date" >= DATE '2026-05-01' AND "date" < DATE '2026-07-01')
+    SELECT ((g.cur - g.prev) / g.prev)::float AS gmv_change,
+           ((u.cur - u.prev) / u.prev)::float AS uv_change,
+           (((g.cur / u.cur) - (g.prev / u.prev)) / NULLIF(g.prev / u.prev, 0))::float AS yield_change
+    FROM g, u
+  expected:
+    value: -0.254283
+    direction: down
+    extras:
+      uv_change: -0.155214
+      yield_change: -0.117272
+    tolerance: 0.02
+  value_desc: 面部精华 GMV 环比（主值）；extras 为流量/转化因子分解
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: §5.3 分解口径：GMV 环比 = (1+UV 环比)×(1+单位 UV 产出环比)−1；UV 取护肤 l1 （traffic_daily 无 l2），单位 UV 产出 = 面部精华
+    GMV ÷ 护肤 UV。预期约 -25.4% = -15.5% ⊕ -11.7%。
+- id: dr002
+  question: 护肤品类 6 月 GMV 环比下滑主要由哪些二级类目贡献
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT p.category_l2 AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-06-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-07-01'
+        AND p.category_l1 = '护肤'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - 面部精华
+      - -266891.14
+      - 0.582152
+    - - 面霜
+      - -87272.71
+      - 0.190362
+    - - 乳液
+      - -41261.26
+      - 0.09
+    - - 化妆水
+      - -27283
+      - 0.059511
+    - - 面膜
+      - -26608.87
+      - 0.05804
+    - - 防晒
+      - -13512.14
+      - 0.029473
+    - - 洁面
+      - 4372.78
+      - -0.009538
+    direction: down
+    extras:
+      overall_change: -0.181155
+      top_dim: 面部精华
+      top_delta: -266891.14
+    tolerance: 0.02
+  value_desc: 逐二级类目 (类目, ΔGMV, 占总变化份额)，按 |Δ| 降序
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 贡献度 = ΔGMV ÷ 全部 l2 的 ΔGMV 合计；预期面部精华为最大负贡献。
+- id: dr003
+  question: 面部精华 6 月哪些天下滑最狠
+  type: drilldown
+  standard_sql: |
+    WITH daily AS (
+      SELECT o.paid_at::date AS d, SUM(oi.unit_price * oi.quantity)::float AS g
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-07-01'
+        AND p.category_l1 = '护肤' AND p.category_l2 = '面部精华'
+      GROUP BY 1),
+    may_avg AS (
+      SELECT AVG(g)::float AS a FROM daily WHERE d < DATE '2026-06-01'),
+    june AS (
+      SELECT to_char(d, 'MM-DD') AS dim, g AS cur FROM daily
+      WHERE d >= DATE '2026-06-01' AND d < DATE '2026-07-01')
+    SELECT dim, cur, may_avg.a AS prev, (cur - may_avg.a)::float AS delta,
+           ((cur - may_avg.a) / NULLIF(SUM(cur - may_avg.a) OVER (), 0))::float AS share
+    FROM june CROSS JOIN may_avg
+    ORDER BY delta ASC
+    LIMIT 5
+  expected:
+    value:
+    - - 06-30
+      - -18753.643226
+      - 0.080476
+    - - 06-01
+      - -16886.083226
+      - 0.072462
+    - - 06-15
+      - -13969.533226
+      - 0.059946
+    - - 06-23
+      - -13693.653226
+      - 0.058763
+    - - 06-08
+      - -12903.413226
+      - 0.055371
+    direction: down
+    extras:
+      overall_change: -0.45016
+      top_dim: 06-30
+      top_delta: -18753.643226
+    tolerance: 0.02
+  value_desc: 下滑最狠 Top5 日 (日期, Δvs5月日均, 份额)
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 日基线 = 5 月日均 GMV；6 月逐日 (当日−基线)，按 delta 升序取前 5；6 月全效下滑段。
+- id: dr004
+  question: 618 大促的 GMV 增长主要由哪些渠道贡献
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT o.channel AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-05-31' AND o.paid_at < DATE '2026-06-19'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-05-31'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-05-01' AND o.paid_at < DATE '2026-06-19'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - app
+      - -1057286.7
+      - 0.383784
+    - - live
+      - -825438.5
+      - 0.299625
+    - - mini
+      - -625114.73
+      - 0.22691
+    - - web
+      - -247060.79
+      - 0.08968
+    direction: down
+    extras:
+      overall_change: -0.392174
+      top_dim: app
+      top_delta: -1057286.7
+    tolerance: 0.02
+  value_desc: 逐渠道 (渠道, ΔGMV, 份额)，活动期 vs 活动前 30 天
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 活动期 [2026-05-31, 2026-06-19)（含 6-18 全天），基线 = 活动前 30 天 [2026-05-01, 2026-05-31)。
+- id: dr005
+  question: 2026 年 8 月香水 GMV 环比变化主要来自哪些二级类目
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT p.category_l2 AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-09-01'
+        AND p.category_l1 = '香水'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - 女士香水
+      - 89806.28
+      - 0.687519
+    - - 男士香水
+      - 38248.32
+      - 0.292813
+    - - 香氛礼盒
+      - 2569.07
+      - 0.019668
+    direction: up
+    extras:
+      overall_change: 0.188459
+      top_dim: 女士香水
+      top_delta: 89806.28
+    tolerance: 0.02
+  value_desc: 逐二级类目 (类目, ΔGMV, 份额)，8 月 vs 7 月
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 香水 l2 仅 3 个（女士香水/男士香水/香氛礼盒）；两窗 [08-01,09-01) 与 [07-01,08-01)。
+- id: dr006
+  question: 暑期狂欢活动的 GMV 增长是流量驱动还是转化驱动
+  type: drilldown
+  standard_sql: |
+    WITH g AS (
+      SELECT (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-07-13'))::float AS gmv_cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-19' AND o.paid_at < DATE '2026-07-01'))::float AS gmv_prev,
+             (COUNT(DISTINCT o.order_id)
+              FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-07-13'))::float AS o_cur,
+             (COUNT(DISTINCT o.order_id)
+              FILTER (WHERE o.paid_at >= DATE '2026-06-19' AND o.paid_at < DATE '2026-07-01'))::float AS o_prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-06-19' AND o.paid_at < DATE '2026-07-13'),
+    u AS (
+      SELECT (SUM(uv) FILTER (WHERE "date" >= DATE '2026-07-01' AND "date" < DATE '2026-07-13'))::float AS u_cur,
+             (SUM(uv) FILTER (WHERE "date" >= DATE '2026-06-19' AND "date" < DATE '2026-07-01'))::float AS u_prev
+      FROM traffic_daily
+      WHERE "date" >= DATE '2026-06-19' AND "date" < DATE '2026-07-13')
+    SELECT ((g.gmv_cur - g.gmv_prev) / g.gmv_prev)::float AS gmv_change,
+           ((u.u_cur - u.u_prev) / u.u_prev)::float AS uv_change,
+           (((g.o_cur / u.u_cur) - (g.o_prev / u.u_prev)) / NULLIF(g.o_prev / u.u_prev, 0))::float AS cvr_change,
+           (((g.gmv_cur / g.o_cur) - (g.gmv_prev / g.o_prev)) / NULLIF(g.gmv_prev / g.o_prev, 0))::float AS aov_change
+    FROM g, u
+  expected:
+    value: 0.186125
+    direction: up
+    extras:
+      uv_change: 0.121515
+      cvr_change: 0.048342
+      aov_change: 0.008841
+    tolerance: 0.02
+  value_desc: GMV 环比（主值）；extras 为 UV/转化/客单三因子分解
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 暑期狂欢 [2026-07-01, 2026-07-13)（12 天）vs 前 12 天 [2026-06-19, 2026-07-01)； GMV=UV×CVR×AOV 严格乘法分解（伸缩恒等式）。
+- id: dr007
+  question: 双 11 大促的 GMV 增长相比常规期主要由哪些品类贡献
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT p.category_l1 AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2025-11-01' AND o.paid_at < DATE '2025-11-12'))::float / 11 AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2025-10-08' AND o.paid_at < DATE '2025-10-20'))::float / 12 AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2025-10-08' AND o.paid_at < DATE '2025-11-12'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - 护肤
+      - 61518.775379
+      - 0.375454
+    - - 彩妆
+      - 44508.419545
+      - 0.271638
+    - - 女装
+      - 19462.732197
+      - 0.118783
+    - - 香水
+      - 18162.478712
+      - 0.110847
+    - - 男装
+      - 10706.452424
+      - 0.065342
+    - - 配饰
+      - 9492.979091
+      - 0.057936
+    direction: up
+    extras:
+      overall_change: 0.687588
+      top_dim: 护肤
+      top_delta: 61518.775379
+    tolerance: 0.02
+  value_desc: 逐品类 (品类, Δ日均GMV, 份额)
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 两窗长度不同（11 天 vs 12 天），取日均口径：双 11 [2025-11-01,11-12)，常规期取国庆后、 彩妆品牌周前的 [2025-10-08, 2025-10-20)。
+- id: dr008
+  question: 2026 年 8 月全场 GMV 环比 7 月的变化由哪些品类贡献
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT p.category_l1 AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-09-01'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - 香水
+      - 130623.67
+      - 1.124708
+    - - 彩妆
+      - -58129.52
+      - -0.500512
+    - - 护肤
+      - 19904.53
+      - 0.171384
+    - - 男装
+      - 17290.27
+      - 0.148874
+    - - 配饰
+      - 6205.29
+      - 0.053429
+    - - 女装
+      - 245.84
+      - 0.002117
+    direction: up
+    extras:
+      overall_change: 0.015825
+      top_dim: 香水
+      top_delta: 130623.67
+    tolerance: 0.02
+  value_desc: 逐品类 (品类, ΔGMV, 份额)，8 月 vs 7 月
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 一单只属一个 l1（生成器保证），各 l1 之和 = 全场；两窗各 31 天。
+- id: dr009
+  question: 88 会员节的 GMV 相比上周同期主要由哪些渠道贡献
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT o.channel AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-08-08' AND o.paid_at < DATE '2026-08-11'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-08-04'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-08-11'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - live
+      - 65801.47
+      - 0.398226
+    - - mini
+      - 59840.45
+      - 0.36215
+    - - app
+      - 36979.11
+      - 0.223795
+    - - web
+      - 2615.42
+      - 0.015828
+    direction: up
+    extras:
+      overall_change: 0.22043
+      top_dim: live
+      top_delta: 65801.47
+    tolerance: 0.02
+  value_desc: 逐渠道 (渠道, ΔGMV, 份额)
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 88 会员节 [2026-08-08, 2026-08-11)（周六~周一 3 天），上周同期 [2026-08-01, 2026-08-04) （同为周六~周一 3 天，星期对齐）。
+- id: dr010
+  question: 女王节的 GMV 增长相比前一周主要由哪些品类贡献
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT p.category_l1 AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-03-01' AND o.paid_at < DATE '2026-03-09'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-02-21' AND o.paid_at < DATE '2026-03-01'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-02-21' AND o.paid_at < DATE '2026-03-09'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - 女装
+      - 129016.92
+      - 0.48475
+    - - 彩妆
+      - 106274.55
+      - 0.399301
+    - - 护肤
+      - 68191.26
+      - 0.256212
+    - - 香水
+      - -37174.64
+      - -0.139675
+    - - 配饰
+      - -5328.37
+      - -0.02002
+    - - 男装
+      - 5171.89
+      - 0.019432
+    direction: up
+    extras:
+      overall_change: 0.143609
+      top_dim: 女装
+      top_delta: 129016.92
+    tolerance: 0.02
+  value_desc: 逐品类 (品类, ΔGMV, 份额)
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 女王节 [2026-03-01, 2026-03-09)（8 天，含 3-08），前一周 [2026-02-21, 2026-03-01) （8 天）；女装 full_reduction
+    与彩妆 gift 两场活动叠加。
+- id: dr011
+  question: 2026 年 9 月上半月全场 GMV 环比 8 月上半月的变化由哪些品类贡献
+  type: drilldown
+  standard_sql: |
+    WITH m AS (
+      SELECT p.category_l1 AS dim,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-09-01' AND o.paid_at < DATE '2026-09-14'))::float AS cur,
+             (SUM(oi.unit_price * oi.quantity)
+              FILTER (WHERE o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-08-14'))::float AS prev
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-14'
+      GROUP BY 1)
+    SELECT dim, cur, prev, (cur - prev)::float AS delta,
+           ((cur - prev) / NULLIF(SUM(cur - prev) OVER (), 0))::float AS share
+    FROM m
+    ORDER BY ABS(cur - prev) DESC
+  expected:
+    value:
+    - - 护肤
+      - 77916.67
+      - -1.662976
+    - - 彩妆
+      - -62546.97
+      - 1.334941
+    - - 香水
+      - -60470.27
+      - 1.290618
+    - - 女装
+      - 13215.23
+      - -0.282053
+    - - 男装
+      - -12962.5
+      - 0.276659
+    - - 配饰
+      - -2005.91
+      - 0.042812
+    direction: down
+    extras:
+      overall_change: -0.014678
+      top_dim: 护肤
+      top_delta: 77916.67
+    tolerance: 0.02
+  value_desc: 逐品类 (品类, ΔGMV, 份额)，半月对半月
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: 半月同长对齐：9 月上半 [2026-09-01, 09-14)（13 天，至数据末日）vs 8 月上半 [2026-08-01, 08-14)（13 天）。
+- id: dr012
+  question: 618 大促带来了多少新客复购增量
+  type: drilldown
+  standard_sql: |
+    WITH paid AS (
+      SELECT user_id, paid_at FROM orders
+      WHERE status IN ('paid', 'shipped', 'completed')),
+    first_order AS (
+      SELECT user_id, MIN(paid_at) AS fp FROM paid GROUP BY user_id),
+    new_users AS (
+      SELECT user_id, fp,
+             CASE WHEN fp >= DATE '2026-05-31' AND fp < DATE '2026-06-19' THEN 'act'
+                  WHEN fp >= DATE '2026-05-01' AND fp < DATE '2026-05-31' THEN 'base' END AS grp
+      FROM first_order),
+    repeaters AS (
+      SELECT DISTINCT n.user_id, n.grp FROM new_users n
+      JOIN paid ON paid.user_id = n.user_id
+       AND paid.paid_at > n.fp AND paid.paid_at <= n.fp + interval '30 days'),
+    agg AS (
+      SELECT n.grp, count(*)::float AS n_users, count(r.user_id)::float AS n_repeat
+      FROM new_users n
+      LEFT JOIN repeaters r ON r.user_id = n.user_id AND r.grp = n.grp
+      GROUP BY 1)
+    SELECT ((max(n_repeat) FILTER (WHERE grp = 'act') / max(n_users) FILTER (WHERE grp = 'act'))
+          - (max(n_repeat) FILTER (WHERE grp = 'base') / max(n_users) FILTER (WHERE grp = 'base')))::float AS diff_pp,
+           (max(n_repeat) FILTER (WHERE grp = 'act') / max(n_users) FILTER (WHERE grp = 'act'))::float AS rate_activity,
+           (max(n_repeat) FILTER (WHERE grp = 'base') / max(n_users) FILTER (WHERE grp = 'base'))::float AS rate_baseline,
+           (max(n_users) FILTER (WHERE grp = 'act'))::int AS n_activity,
+           (max(n_users) FILTER (WHERE grp = 'base'))::int AS n_baseline
+    FROM agg
+  expected:
+    value: 0.069739
+    direction: up
+    extras:
+      rate_activity: 0.179505
+      rate_baseline: 0.109765
+      n_activity: 1454
+      n_baseline: 1321
+    tolerance: 0.02
+  value_desc: 复购率差（小数，0.07 即 +7pp）；extras 含两期复购率与样本量
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - decompose
+  - report
+  notes: §5.2 活动复购增量：活动期新客（首单 paid_at ∈ [2026-05-31, 2026-06-19)）30 日复购率 − 基线期新客（[2026-05-01, 2026-05-31)，即活动前
+    30 天）30 日复购率；SPEC §5.3 预期约 +6.97pp。
+- id: tn001
+  question: 618 大促期间 GMV Top5 品牌及其占比
+  type: topn
+  standard_sql: |
+    WITH b AS (
+      SELECT p.brand AS dim, SUM(oi.unit_price * oi.quantity)::float AS gmv
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-05-31' AND o.paid_at < DATE '2026-06-19'
+      GROUP BY 1)
+    SELECT dim, gmv, (gmv / NULLIF(SUM(gmv) OVER (), 0))::float AS share
+    FROM b
+    ORDER BY gmv DESC, dim
+    LIMIT 5
+  expected:
+    value:
+    - - 雪滢
+      - 469214.49
+      - 0.109892
+    - - 绯迦
+      - 355477.37
+      - 0.083254
+    - - 橘屿
+      - 227802
+      - 0.053352
+    - - 澄川
+      - 159378.47
+      - 0.037327
+    - - 拾色
+      - 145395.95
+      - 0.034052
+    direction: none
+    extras:
+      top1: 雪滢
+      top1_metric: 469214.49
+      top1_share: 0.109892
+    tolerance: 0.02
+  value_desc: Top5 品牌 [(品牌, GMV, 占比)]，占比分母=活动期全场 GMV
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 活动期 [2026-05-31, 2026-06-19)；占比分母为该窗口全部品牌 GMV 合计（窗口先于 LIMIT）。
+- id: tn002
+  question: 2026 年 6 月护肤品类 GMV Top5 二级类目及其占比
+  type: topn
+  standard_sql: |
+    WITH b AS (
+      SELECT p.category_l2 AS dim, SUM(oi.unit_price * oi.quantity)::float AS gmv
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+        AND p.category_l1 = '护肤'
+      GROUP BY 1)
+    SELECT dim, gmv, (gmv / NULLIF(SUM(gmv) OVER (), 0))::float AS share
+    FROM b
+    ORDER BY gmv DESC, dim
+    LIMIT 5
+  expected:
+    value:
+    - - 面部精华
+      - 782689.91
+      - 0.377695
+    - - 面霜
+      - 481160.26
+      - 0.232189
+    - - 化妆水
+      - 240640.05
+      - 0.116123
+    - - 乳液
+      - 198013.87
+      - 0.095554
+    - - 面膜
+      - 172844.65
+      - 0.083408
+    direction: none
+    extras:
+      top1: 面部精华
+      top1_metric: 782689.91
+      top1_share: 0.377695
+    tolerance: 0.02
+  value_desc: Top5 二级类目 [(类目, GMV, 占比)]
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 窗口 [2026-06-01, 2026-07-01)；护肤 7 个 l2 取前 5；占比分母=护肤当月 GMV。
+- id: tn003
+  question: 全部数据里 GMV Top3 品牌及其占比
+  type: topn
+  standard_sql: |
+    WITH b AS (
+      SELECT p.brand AS dim, SUM(oi.unit_price * oi.quantity)::float AS gmv
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+      GROUP BY 1)
+    SELECT dim, gmv, (gmv / NULLIF(SUM(gmv) OVER (), 0))::float AS share
+    FROM b
+    ORDER BY gmv DESC, dim
+    LIMIT 3
+  expected:
+    value:
+    - - 雪滢
+      - 11145084.69
+      - 0.123519
+    - - 绯迦
+      - 6630910.06
+      - 0.073489
+    - - 橘屿
+      - 4373567.63
+      - 0.048471
+    direction: none
+    extras:
+      top1: 雪滢
+      top1_metric: 11145084.69
+      top1_share: 0.123519
+    tolerance: 0.02
+  value_desc: 全时段 Top3 品牌 [(品牌, GMV, 占比)]，故事 3 主指标
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 全时段 = 数据全程 2025-09-15 ~ 2026-09-13；SPEC §5.3 预期 Top1 雪滢占比约 12.35%、 为 Top2（绯迦）约 1.68 倍。
+- id: tn004
+  question: 2026 年 8 月支付订单数 Top3 渠道及其占比
+  type: topn
+  standard_sql: |
+    WITH c AS (
+      SELECT o.channel AS dim, COUNT(*)::float AS paid_orders
+      FROM orders o
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-08-01' AND o.paid_at < DATE '2026-09-01'
+      GROUP BY 1)
+    SELECT dim, paid_orders, (paid_orders / NULLIF(SUM(paid_orders) OVER (), 0))::float AS share
+    FROM c
+    ORDER BY paid_orders DESC, dim
+    LIMIT 3
+  expected:
+    value:
+    - - app
+      - 2604
+      - 0.353708
+    - - live
+      - 2273
+      - 0.308748
+    - - mini
+      - 1761
+      - 0.239201
+    direction: none
+    extras:
+      top1: app
+      top1_metric: 2604
+      top1_share: 0.353708
+    tolerance: 0.02
+  value_desc: Top3 渠道 [(渠道, 支付订单数, 占比)]
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 窗口 [2026-08-01, 2026-09-01)；渠道在 orders 上，无明细展开故无需去重。
+- id: tn005
+  question: 双 11 大促期间 GMV Top5 商品及其占比
+  type: topn
+  standard_sql: |
+    WITH b AS (
+      SELECT p.product_name AS dim, SUM(oi.unit_price * oi.quantity)::float AS gmv
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2025-11-01' AND o.paid_at < DATE '2025-11-12'
+      GROUP BY 1)
+    SELECT dim, gmv, (gmv / NULLIF(SUM(gmv) OVER (), 0))::float AS share
+    FROM b
+    ORDER BY gmv DESC, dim
+    LIMIT 5
+  expected:
+    value:
+    - - 雪滢·焕新精华 30ml
+      - 26061.93
+      - 0.005891
+    - - 沐棠·水润精华 15ml
+      - 23865.35
+      - 0.005395
+    - - 山野序·晨间精华 5片装
+      - 16185.97
+      - 0.003659
+    - - 雪滢·净澈面霜 100ml No.0086
+      - 15137.12
+      - 0.003422
+    - - 镜屋·清透粉底液 礼盒装
+      - 15041.69
+      - 0.0034
+    direction: none
+    extras:
+      top1: 雪滢·焕新精华 30ml
+      top1_metric: 26061.93
+      top1_share: 0.005891
+    tolerance: 0.02
+  value_desc: Top5 商品 [(商品名, GMV, 占比)]
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 双 11 [2025-11-01, 2025-11-12)；商品名全库唯一；占比分母=活动期全场 GMV。
+- id: tn006
+  question: 2026 年 6 月面膜类目 GMV Top5 品牌及其占比
+  type: topn
+  standard_sql: |
+    WITH b AS (
+      SELECT p.brand AS dim, SUM(oi.unit_price * oi.quantity)::float AS gmv
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+        AND p.category_l1 = '护肤' AND p.category_l2 = '面膜'
+      GROUP BY 1)
+    SELECT dim, gmv, (gmv / NULLIF(SUM(gmv) OVER (), 0))::float AS share
+    FROM b
+    ORDER BY gmv DESC, dim
+    LIMIT 5
+  expected:
+    value:
+    - - 雪滢
+      - 61130.77
+      - 0.353675
+    - - 澄川
+      - 23694.34
+      - 0.137085
+    - - 云栀
+      - 20665.5
+      - 0.119561
+    - - 白汐
+      - 13342.62
+      - 0.077194
+    - - 沐棠
+      - 8888.73
+      - 0.051426
+    direction: none
+    extras:
+      top1: 雪滢
+      top1_metric: 61130.77
+      top1_share: 0.353675
+    tolerance: 0.02
+  value_desc: 面膜类目 Top5 品牌 [(品牌, GMV, 占比)]
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: l2=面膜（属护肤）；占比分母=面膜当月 GMV 合计。
+- id: tn007
+  question: 2026 年 7 月转化率最高的 Top3 渠道
+  type: topn
+  standard_sql: |
+    WITH x AS (
+      SELECT o.channel AS dim, COUNT(*)::float AS paid_orders
+      FROM orders o
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-07-01' AND o.paid_at < DATE '2026-08-01'
+      GROUP BY 1),
+    u AS (
+      SELECT channel, SUM(uv)::float AS uv
+      FROM traffic_daily
+      WHERE "date" >= DATE '2026-07-01' AND "date" < DATE '2026-08-01'
+      GROUP BY 1)
+    SELECT x.dim, (x.paid_orders / NULLIF(u.uv, 0))::float AS cvr
+    FROM x JOIN u ON u.channel = x.dim
+    ORDER BY cvr DESC, x.dim
+    LIMIT 3
+  expected:
+    value:
+    - - live
+      - 0.063035
+    - - mini
+      - 0.035628
+    - - app
+      - 0.029389
+    direction: none
+    extras:
+      top1: live
+      top1_metric: 0.063035
+    tolerance: 0.02
+  value_desc: Top3 渠道 [(渠道, 月度转化率)]
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 渠道转化率 = 该渠道月支付订单数 ÷ 该渠道月 UV（traffic_daily 按 channel 汇总）。
+- id: tn008
+  question: 最近 30 天 GMV Top5 品类及其占比
+  type: topn
+  standard_sql: |
+    WITH b AS (
+      SELECT p.category_l1 AS dim, SUM(oi.unit_price * oi.quantity)::float AS gmv
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN products p ON p.product_id = oi.product_id
+      WHERE o.status IN ('paid', 'shipped', 'completed')
+        AND o.paid_at >= DATE '2026-08-15' AND o.paid_at < DATE '2026-09-14'
+      GROUP BY 1)
+    SELECT dim, gmv, (gmv / NULLIF(SUM(gmv) OVER (), 0))::float AS share
+    FROM b
+    ORDER BY gmv DESC, dim
+    LIMIT 5
+  expected:
+    value:
+    - - 护肤
+      - 2549005.46
+      - 0.353875
+    - - 彩妆
+      - 2011416.97
+      - 0.279242
+    - - 女装
+      - 895930.24
+      - 0.124381
+    - - 香水
+      - 741723.54
+      - 0.102972
+    - - 男装
+      - 549039.57
+      - 0.076222
+    direction: none
+    extras:
+      top1: 护肤
+      top1_metric: 2549005.46
+      top1_share: 0.353875
+    tolerance: 0.02
+  value_desc: Top5 品类 [(品类, GMV, 占比)]
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - run_query
+  - report
+  notes: 「最近 30 天」锚数据末日 2026-09-13：窗口 [2026-08-15, 2026-09-14)；l1 共 6 个取前 5。
+- id: dt001
+  question: 2026 年 6 月的退款订单金额合计是多少
+  type: dirty
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS refund_amount
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status = 'refunded'
+      AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+  expected:
+    value: 212643.17
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 6 月退款订单金额（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - reflect
+  - run_query
+  - report
+  expected_outcome: answered
+  notes: 陷阱=问法直提「退款金额」而库无该字段；正确口径 = status='refunded' 订单的明细金额 合计（unit_price×quantity），时间按 paid_at（退款单均有
+    paid_at），窗口 [2026-06-01, 2026-07-01)。
+- id: dt002
+  question: 2026 年 6 月全站的客单价是多少
+  type: dirty
+  standard_sql: |
+    SELECT (COALESCE(SUM(oi.unit_price * oi.quantity), 0)
+            / NULLIF(COUNT(DISTINCT o.order_id), 0))::float AS aov,
+           COUNT(DISTINCT o.order_id)::int AS paid_orders
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+  expected:
+    value: 955.562116
+    direction: none
+    extras:
+      paid_orders: 6960
+    tolerance: 0.02
+  value_desc: 6 月全站客单价（元/单）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - reflect
+  - run_query
+  - report
+  expected_outcome: answered
+  notes: 口径陷阱：分母若用全部订单（含 cancelled/pending_payment/refunded）会偏小； §5.2 客单价 = GMV ÷ 支付订单数（status∈{paid,shipped,completed}
+    去重 order_id）。
+- id: dt003
+  question: 2026 年 6 月母婴品类的 GMV 是多少
+  type: dirty
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-06-01' AND o.paid_at < DATE '2026-07-01'
+      AND p.category_l1 = '母婴'
+  expected:
+    value: 0
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 6 月母婴 GMV（元，预期 0——库内无该品类）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - reflect
+  - run_query
+  - report
+  expected_outcome: answered
+  notes: 超范围品类：category_l1 只有 护肤/彩妆/香水/女装/男装/配饰；正确结论 = 0 并说明 库内无母婴品类（get_data_profile 可核实枚举值）。
+- id: dt004
+  question: 最近 30 天全站的 GMV 是多少
+  type: dirty
+  standard_sql: |
+    SELECT COALESCE(SUM(oi.unit_price * oi.quantity), 0)::float AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.status IN ('paid', 'shipped', 'completed')
+      AND o.paid_at >= DATE '2026-08-15' AND o.paid_at < DATE '2026-09-14'
+  expected:
+    value: 7203129.58
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 最近 30 天全场 GMV（元）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - reflect
+  - run_query
+  - report
+  expected_outcome: answered
+  notes: 时间边界歧义：若锚真实当前日期（数据末日 2026-09-13 之后），窗口将越界得空集， 需按空集纠错回灌后改锚数据末日；约定窗口 [2026-08-15, 2026-09-14)。
+- id: dt005
+  question: 对比雪滢面部精华在我们和竞对平台的价格
+  type: dirty
+  standard_sql: |
+    SELECT COUNT(*)::int AS own_platform_skus
+    FROM products
+    WHERE brand = '雪滢' AND category_l2 = '面部精华'
+  expected:
+    value: 53
+    direction: none
+    extras: {}
+    tolerance: 0.02
+  value_desc: 自营在售 SKU 数（仅可核实的事实部分；本题无数值裁判）
+  expected_path:
+  - plan
+  - get_schema
+  - text2sql
+  - validate_sql
+  - reflect
+  - report
+  expected_outcome: unanswerable
+  notes: 无解问法：库仅含自营单店数据，无竞对平台/价格字段；正确行为 = 结论说明数据边界、 不编造对比数值（预期 failed/partial + 局限说明，不计入纠错成功）。standard_sql
+    仅核实 自营侧 SKU 存在性以满足「全部可执行」要求。
