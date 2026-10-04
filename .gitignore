@@ -1,9 +1,11 @@
 # secrets & local config
 .env
 
-# runtime artifacts
+# runtime artifacts（评测报告 eval/reports/ 有意入库，供 README 对账）
 runs/
-eval/reports/
+
+# IDE
+.idea/
 
 # python
 .venv/
