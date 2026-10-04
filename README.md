@@ -1,11 +1,19 @@
 # chatbi-agent
 
+[![CI](https://github.com/Thekshy/chatbi-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/Thekshy/chatbi-agent/actions/workflows/ci.yml)
+
 垂类电商（美妆 / 服饰）ChatBI 智能体：自然语言提问 → LangGraph Plan-Execute 编排 →
 schema 检索 → text2sql → 只读查询 → 下钻 / 指标计算，输出带数据证据的结构化分析结论。
 
 规格见 [SPEC.md](SPEC.md)，任务拆解见 [TICKETS.md](TICKETS.md)。当前进度：**v1 完成（T1–T11 全部收口）**。
 离线评测 50 题 × 3 采样实测：结论正确率 70%、一致性 92% 达标；执行正确率 76%、纠错成功率 0% 未达标，
 明细与原因见下文[评测](#评测)与[未达标项与已知问题](#未达标项与已知问题)。
+
+深入文档（docs/）：
+[架构与数据流](docs/架构与数据流.md) ·
+[评测方法与指标定义](docs/评测方法与指标定义.md) ·
+[安全边界设计](docs/安全边界设计.md) ·
+[深挖讲解地图（函数级）](docs/深挖讲解地图.md)
 
 ## 技术栈
 
@@ -39,13 +47,16 @@ trace：每次分析全量落盘 runs/<run_id>/trace.jsonl；SqliteSaver checkpo
 
 ```
 ├── SPEC.md / TICKETS.md     # 规格与任务（唯一对齐依据）
+├── docs/                    # 架构 / 评测方法 / 安全边界 / 深挖讲解地图（含运行截图）
+├── .github/workflows/ci.yml # CI：ruff + 150 条单测（不依赖真实 LLM key / PG）
+├── Dockerfile               # Web 壳容器（本地可跑；PG 留在宿主机）
 ├── pyproject.toml           # uv 管理，运行 + 开发依赖
 ├── .env.example             # 环境变量模板（复制为 .env）
 ├── src/chatbi/              # 核心库（api.analyze() 为评测与 Web 共用唯一入口）
 ├── data/                    # mock 生成器（种子 20260915，一键重建 5 表 + 植入故事）
 ├── eval/                    # 50 题标注集 + 评测 harness + reports/（评测产物入库）
 ├── runs/                    # trace 落盘（gitignore；评测 trace 在 runs/eval/）
-└── tests/                   # pytest（163 条）
+└── tests/                   # pytest（163 条；13 条 integration 需本机环境，CI 排除）
 ```
 
 ## 环境准备（一次性）
@@ -104,12 +115,18 @@ uv run python -m eval.validate_dataset --check    # 标注集标准 SQL 连库�
 单次分析同步等待约 30–60s（实测平均 53s/次）。问题范围见 SPEC §3（单指标 / 同环比 /
 下钻归因 / TopN / 活动复购增量，4+1 类问法）。
 
-## 测试
+## 测试与 CI
 
 ```bash
-uv run pytest        # 163 条：工具层校验用例、图条件边与预算（FakeLLM）、trace、API、Web
-uv run ruff check .  # lint
+uv run pytest                        # 全量 163 条（含 integration：本机 PG + key，缺失自动 skip）
+uv run pytest -m "not integration"   # 150 条纯单测（FakeLLM / 工具替身 / ASGI mock），CI 同口径
+uv run ruff check .                  # lint
 ```
+
+GitHub Actions（`.github/workflows/ci.yml`）：push / PR 触发 ruff + 150 条单测，
+不依赖真实 LLM key 与本机 PG。Docker 本地跑 Web 壳：`docker build -t chatbi-agent .`
+后 `docker run --rm -p 8000:8000 --env-file .env -e PG_DSN_RO=... chatbi-agent`
+（容器内连宿主机 PG 把 127.0.0.1 换 host.docker.internal，详见 Dockerfile 头注）。
 
 ## 评测
 
