@@ -23,12 +23,12 @@ T1 骨架+环境 ──┬──> T2 mock 数据 ──┬──> T4 工具层 �
 ## T1 · 项目骨架与 PG 环境
 
 - **① 目标**：空项目可跑通工具链，PG 库与双账号就绪。
-- **② 背景**：SPEC §7 DB 契约、§9 工程栈。本机 Homebrew PG 17.11 已装、服务未常驻；智谱 key 在 `mine/gewu/.env`（`LLM_API_KEY` / `LLM_BASE_URL`）。
+- **② 背景**：SPEC §7 DB 契约、§9 工程栈。本机 Homebrew PG 17.11 已装、服务未常驻；智谱 key 复用本机既有配置（`LLM_API_KEY` / `LLM_BASE_URL`）。
 - **③ 修改范围**：仓库根：`pyproject.toml`、`.gitignore`、`.env.example`、`.env`（本地，不入库）、`README.md` 骨架、`src/chatbi/__init__.py`、`tests/`。不写任何业务模块。
 - **④ 任务**：
   - [ ] `git init` + uv 初始化（Python 3.12）
   - [ ] 装依赖：运行 `langgraph / openai / psycopg / sqlglot / fastapi / uvicorn / pyyaml / python-dotenv`，开发 `pytest / rich / ruff`
-  - [ ] `.env`：`PG_DSN`（chatbi_app）、`PG_DSN_RO`（chatbi_ro）、`ZHIPU_API_KEY`、`CHATBI_MODEL=glm-5.3`（key 从 gewu 拷贝）
+  - [ ] `.env`：`PG_DSN`（chatbi_app）、`PG_DSN_RO`（chatbi_ro）、`ZHIPU_API_KEY`、`CHATBI_MODEL=glm-5.3`（key 从本机既有配置拷贝）
   - [ ] `brew services start` 起 PG；建库 `chatbi`；建角色 `chatbi_app`（读写）、`chatbi_ro`（只读，撤销 public 的 create）
   - [ ] pytest + ruff 配置；冒烟测试一条（chatbi_ro 连库查版本）
 - **⑤ 验收**：`uv run pytest` 全绿；`chatbi_ro` 能连 `chatbi` 但建表被拒；`.env` 能被 dotenv 读出全部键。

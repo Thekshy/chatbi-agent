@@ -3,7 +3,7 @@
 # 构建：docker build -t chatbi-agent .
 # 运行：docker run --rm -p 8000:8000 --env-file .env -e PG_DSN_RO="postgresql://chatbi_ro:<密码>@host.docker.internal:5432/chatbi" chatbi-agent
 #   （容器内连宿主机 PG 需把 127.0.0.1 换成 host.docker.internal；.env 其余键原样透传）
-# 注意：SPEC「PG 部署形态」记录了内网 DNS 封锁容器镜像源——离线环境需先手动导基础镜像。
+# 注意：受限网络环境拉取镜像可能不可用——离线场景需先手动导入基础镜像。
 
 FROM python:3.12-slim
 

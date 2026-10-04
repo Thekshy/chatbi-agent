@@ -153,7 +153,7 @@ chatbi-agent/
 - **core 库**：`analyze(question: str, *, config: RunConfig) -> AnalysisResult`
   - `AnalysisResult = {status: answered|partial|failed, conclusion: str, evidence: [{sql, row_count, rows_preview, ms}], steps: [...], usage: {llm_calls, tokens_in/out, cost_est}, trace_dir: Path}`
 - **数据库**：PG 16+，库名 `chatbi`，账号 `chatbi_app`（读写，仅生成器）/ `chatbi_ro`（只读，运行时唯一）；连接串走 `.env`（`PG_DSN` / `PG_DSN_RO`）。
-- **LLM**：`ZHIPU_API_KEY`、`CHATBI_MODEL=glm-5.3`（已锁定；key 复用 `mine/gewu/.env` 中 `LLM_API_KEY`，端点 `https://open.bigmodel.cn/api/coding/paas/v4/`，OpenAI 兼容。订阅制无按 token 单价，`cost_est` 以 token 用量为主、费用估算可选）。
+- **LLM**：`ZHIPU_API_KEY`、`CHATBI_MODEL=glm-5.3`（已锁定；key 复用本机既有配置拷贝入 `.env`（不入库），端点 `https://open.bigmodel.cn/api/coding/paas/v4/`，OpenAI 兼容。订阅制无按 token 单价，`cost_est` 以 token 用量为主、费用估算可选）。
 
 ## 8. 验收标准（EARS）
 
@@ -194,6 +194,6 @@ chatbi-agent/
 
 已收口：
 - PG 环境（2026-09-14）：本机 Homebrew PostgreSQL 17.11 已安装；服务启动、建库 `chatbi`、建账号 `chatbi_app`/`chatbi_ro` 归环境 ticket（T1）。
-- 智谱模型（2026-09-14）：`glm-5.3`，key 与端点复用 `mine/gewu/.env`（T1 建 `.env` 时拷贝，不入库）。
-- PG 部署形态（2026-09-15）：确认继续用 brew 单实例、**按库隔离**（每项目独立 database + 独立角色，不切 Docker——内网 DNS 封锁全部容器镜像源，离线导镜像维护成本高）；`brew pin postgresql@17` 锁版本防 brew 自动升级动数据目录。
+- 智谱模型（2026-09-14）：`glm-5.3`，key 与端点复用本机既有配置（T1 建 `.env` 时拷贝，不入库）。
+- PG 部署形态（2026-09-15）：确认继续用 brew 单实例、**按库隔离**（每项目独立 database + 独立角色，不切 Docker——本机网络拉取容器镜像受限，离线导镜像维护成本高）；`brew pin postgresql@17` 锁版本防 brew 自动升级动数据目录。
 - 植入故事数值（2026-09-15，T2）：§5.3 三个故事实测定稿——面部精华 6 月 GMV 环比 -25.4%（护肤 UV -15.5% / 单位 UV 产出 -11.7%）；618 新客 30 日复购差 +6.97pp（17.95% vs 10.98%）；全场 Top1 雪滢占 12.35%（1.68× 于 Top2），逐月恒定。种子 20260915，`uv run python -m data.mock_gen` 一键复现。
