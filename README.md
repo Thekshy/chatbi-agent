@@ -15,6 +15,11 @@ schema 检索 → text2sql → 只读查询 → 下钻 / 指标计算，输出�
 [安全边界设计](docs/安全边界设计.md) ·
 [深挖讲解地图（函数级）](docs/深挖讲解地图.md)
 
+运行实拍（真实 LLM + 真实 mock 库，2026-10-04）：Web 结论区（TopN 问法，含局限与说明）
+![Web 结论区](docs/assets/web-结论区.png)；
+CLI 终端渲染（单指标问法，结论/证据/步骤时间线）见
+[docs/assets/cli-分析输出.svg](docs/assets/cli-分析输出.svg)。
+
 ## 技术栈
 
 Python 3.12 + uv · PostgreSQL 17（本机 Homebrew）· LangGraph（StateGraph + SqliteSaver）·
