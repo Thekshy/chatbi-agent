@@ -1,6 +1,7 @@
 """T1 冒烟测试：.env 可读、PG 双账号就绪、只读边界生效。
 
 依赖本机环境：brew services 管理的 PostgreSQL（chatbi 库 + chatbi_app/chatbi_ro 角色）。
+CI 无本机 PG / .env，经 ``-m "not integration"`` 整体跳过。
 """
 
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 import psycopg
 import pytest
 from dotenv import dotenv_values
+
+pytestmark = pytest.mark.integration
 
 ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 REQUIRED_KEYS = ("PG_DSN", "PG_DSN_RO", "ZHIPU_API_KEY", "CHATBI_MODEL")
