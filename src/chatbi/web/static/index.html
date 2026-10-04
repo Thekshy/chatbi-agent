@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChatBI · 电商数据分析</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>ChatBI <span class="sub">垂类电商数据分析</span></h1>
+  <span id="health" class="health unknown" title="服务健康状态">●</span>
+</header>
+<main>
+  <section class="card" id="ask-section">
+    <label for="question">用自然语言提问（单指标 / 同环比 / 下钻归因 / TopN / 活动复购）</label>
+    <div class="ask-row">
+      <textarea id="question" rows="2" maxlength="2000"
+        placeholder="例：2026 年 6 月护肤品类的 GMV 是多少？"></textarea>
+      <button id="ask-btn">分析</button>
+    </div>
+    <p class="hint">同步分析通常需要 30~60 秒，请耐心等待。</p>
+    <div id="loading" class="loading" hidden>
+      <span class="spinner" aria-hidden="true"></span>
+      <span id="loading-text">分析中（通常 30~60 秒）… 已等待 0 秒</span>
+    </div>
+    <div id="ask-error" class="error" hidden></div>
+  </section>
+
+  <section class="card" id="result-section" hidden>
+    <div class="result-head">
+      <span id="status-badge" class="badge"></span>
+      <span id="result-question" class="dim"></span>
+      <button id="view-trace-btn" class="ghost" hidden>查看本次 trace</button>
+    </div>
+    <div id="conclusion" class="conclusion md"></div>
+    <h3>证据</h3>
+    <div class="table-wrap">
+      <table class="grid" id="evidence-table">
+        <thead><tr><th>ID</th><th>说明</th><th>SQL</th><th>行数</th><th>耗时</th><th>结果预览</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <h3>步骤时间线</h3>
+    <div class="table-wrap">
+      <table class="grid" id="steps-table">
+        <thead><tr><th>步骤</th><th>说明</th><th>尝试</th><th>结局</th><th>错误</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="usage" class="usage"></div>
+    <div id="result-errors" class="error" hidden></div>
+  </section>
+
+  <section class="card" id="schema-section">
+    <details id="schema-details">
+      <summary>库结构速览（辅助提问）</summary>
+      <div id="schema-body"><button id="load-schema-btn" class="ghost">加载结构</button></div>
+    </details>
+  </section>
+
+  <section class="card" id="history-section">
+    <div class="history-head">
+      <h2>历史 trace</h2>
+      <button id="refresh-traces-btn" class="ghost">刷新</button>
+    </div>
+    <div id="trace-error" class="error" hidden></div>
+    <div id="trace-list"></div>
+    <div id="trace-detail" hidden>
+      <button id="back-to-list-btn" class="ghost">← 返回列表</button>
+      <div id="trace-detail-body"></div>
+    </div>
+  </section>
+</main>
+<footer class="dim">ChatBI v1 · 本地单用户 · trace 落盘 runs/&lt;run_id&gt;/trace.jsonl</footer>
+<script src="/app.js"></script>
+</body>
+</html>
